@@ -1,5 +1,6 @@
+# ฮาย
 # Node Express & Typescript Starter for 2022
-# สวัสดี
+
 *"A minimally opinionated typescript & express starter for 2022"*
 
 ## Usage:
