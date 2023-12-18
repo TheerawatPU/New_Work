@@ -1,0 +1,70 @@
+// userController.ts
+import { Request, Response, NextFunction } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { RequestHandler } from 'express';
+import Joi from 'joi';
+import bcrypt from 'bcrypt';
+import prisma from '../lib/db';
+import jwt from 'jsonwebtoken';
+import { sendmail } from '../controllers/sendmilController';
+
+const authLoginMailMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+    const { Email, Password } = req.body;
+
+    const schema = Joi.object({
+        Email: Joi.string().email().min(1).max(255).required(),
+        Password: Joi.string().min(1).max(255).required(),
+    });
+
+    const optionsError = {
+        abortEarly: false, // include all errors
+        allowUnknown: true, // ignore unknown props
+        stripUnknown: true, // remove unknown props
+    };
+
+    const { error } = schema.validate(req.body, optionsError);
+
+    if (error) {
+        return res.status(422).json({
+            status: 422,
+            message: 'Unprocessable Entity',
+            data: error.details,
+        });
+    }
+
+    const lowercaseEmail = Email.toLowerCase();
+
+    // search user in database
+    const user = await prisma.user.findUnique({
+        where: {
+            Email: lowercaseEmail,
+        },
+    });
+
+    // user not in database
+    if (!user) {
+        return res.status(404).json({ message: 'User not found in database' });
+    }
+
+    try {
+        // ทำการ ถอดรหัส password ที่ป้อนมากับใน database ตรงกัน
+        const passwordMatch = await bcrypt.compare(Password, user.Password);
+
+        if (!passwordMatch) {
+            return res.status(404).json({ message: 'The password is Not incorrect.' });
+        }
+
+        // req.userID = user.UserID;
+        res.locals.userID = user.UserID;
+
+        next();
+
+        // return res.json(user);
+        console.log(user);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+export { authLoginMailMiddleware };
