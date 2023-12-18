@@ -1,10 +1,15 @@
 import express from 'express';
-import { getProductCategory, addProductCategory, updateProductCategory, deleteProductCategory } from '../controllers/ProductCategory';
+import {
+    getProductCategory,
+    addProductCategory,
+    updateProductCategory,
+    deleteProductCategory,
+} from '../controllers/ProductCategory';
 const root = express.Router();
 
-root.get('/getProductCategory', getProductCategory )
-root.post('/addProductCategory', addProductCategory )
-root.patch('/updateProductCategory', updateProductCategory )
-root.delete('/deleteProductCategory', deleteProductCategory )
+root.get('/ProductCategory', getProductCategory);
+root.post('/ProductCategory', addProductCategory);
+root.put('/ProductCategory', updateProductCategory);
+root.delete('/ProductCategory', deleteProductCategory);
 
 export default root;

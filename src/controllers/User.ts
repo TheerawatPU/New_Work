@@ -4,156 +4,31 @@ import { RequestHandler } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { CustomHelpers } from 'joi';
 
-//!Get User All
-// const getUserAll: RequestHandler = async (req, res) => {
-//     const prisma = new PrismaClient();
-//     try {
-//         const users = await prisma.user.findMany();
-//         if (users.length === 0) {
-//             return res.status(404).json({ users: 'None users' });
-//         }
-//         return res.json(users);
-//     } catch (error) {
-//         console.error('Error:', error);
-//         return res.status(500).json({ error: 'Internal Server Error' });
-//     } finally {
-//         await prisma.$disconnect();
-//     }
-// };
-
-//!Create User
-// const addUserAll: RequestHandler = async (req, res) => {
-//     // create schema object
-//     const schema =  Joi.object({
-
-//         Email:      Joi.string().min(1).max(255).required(),
-//         Password:   Joi.string().min(1).max(255).required(),
-//         FirstName:  Joi.string().min(1).max(255).required(),
-//         LastName:   Joi.string().min(1).max(255).required(),
-//         FullName:   Joi.string().min(1).max(255).required(), //!แก้ทำแบบให้ FirstName มารวมกับ LastName
-//         Address: Joi.object([{
-//             province: Joi.string().max(255).required(),
-//             district: Joi.string().max(255).required(),
-//             subdistrict: Joi.string().max(255).required(),
-//             Additional: Joi.string().max(255).required()
-//         }]).max(255),
-//         Tel:        Joi.string().min(1).max(10).required(),
-//         Status:     Joi.boolean(),
-//         Remove:     Joi.boolean(),
-//         Active:     Joi.boolean(),
-
-//     });
-
-//     // schema options
-//     const options = {
-//         abortEarly: false, // include all errors
-//         allowUnknown: true, // ignore unknown props
-//         stripUnknown: true, // remove unknown props
-//     };
-
-//     // validate request body against schema
-//     const { error } = schema.validate(req.body, options);
-
-//     if (error) {
-//         return res.status(422).json({
-//             status: 422,
-//             message: 'Unprocessable Entity',
-//             data: error.details,
-//         });
-//     }
-
-//     const body = req.body;
-//     const prisma = new PrismaClient();
-
-//     return await prisma.$transaction(async function (tx) {
-//         const duplicateUser = await tx.user.findMany({
-//             //เช็คว่าตัวไหนซ้ำ ให้ใส่แค่ตัวที่ซ้ำไม่ได้
-//             where: {
-//                 OR: [
-//                     { Email: { contains: body.Email } },
-//                     { Tel: { contains: body.Tel } }
-//                 ]},
-//         });
-
-//         if (duplicateUser && duplicateUser.length > 0) {
-//             return res.status(422).json({
-//                 status: 422,
-//                 message: 'Email or Tel is duplicate in database.',
-//                 data: {
-//                     Email: body.Email,
-//                     Tel: body.Tel
-//                 },
-//             });
-//         }
-
-//         // Generate salt to hash password
-//         // const Salt = await bcrypt.genSalt(10);
-
-//         const payloadUser = {
-
-//             Email:      body.Email,
-//             Password:   body.Password,
-//             FirstName:  body.FirstName,
-//             LastName:   body.LastName,
-//             // FullName:   body.FirstName + body.LastName,
-//             FullName:   body.FullName,
-//             Address:    body.Address,
-//             Tel:        body.Tel,
-//             Status:     body.Status,
-//             Remove:     body.Remove,
-//             Active:     body.Active,
-
-//         };
-
-//         const user = await tx.user.create({
-//             data: payloadUser,
-//         });
-
-//         return res.status(201).json(user);
-//     });
-// };
-
-const getUserAll: RequestHandler = async (req, res) => {
+const getuser: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
-    try {
-        const users = await prisma.user.findMany();
-        if (users.length === 0) {
-            return res.status(404).json({ users: 'None users' });
-        }
-
-        // Map users and add FullnameFL property
-        const usersWithFullnameFL = users.map((user) => ({
-            ...user,
-            FullnameFL: `${user.FirstName} ${user.LastName}`,
-        }));
-
-        return res.json(usersWithFullnameFL);
-    } catch (error) {
-        console.error('Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error' });
-    } finally {
-        await prisma.$disconnect();
-    }
+    const users = await prisma.user.findMany();
+    return res.json(users);
 };
 
-const addUserAll: RequestHandler = async (req, res) => {
+const adduser: RequestHandler = async (req, res) => {
     // create schema object
     const schema = Joi.object({
         Email: Joi.string().min(1).max(255).required(),
         Password: Joi.string().min(1).max(255).required(),
         FirstName: Joi.string().min(1).max(255).required(),
         LastName: Joi.string().min(1).max(255).required(),
-        FullName: Joi.string().min(1).max(255).required(), //!แก้ทำแบบให้ FirstName มารวมกับ LastName
         Address: Joi.object({
             province: Joi.string().max(255).required(),
             district: Joi.string().max(255).required(),
             subdistrict: Joi.string().max(255).required(),
-            Additional: Joi.string().max(255).required(),
+            postcord: Joi.string().max(255).required(),
         }).max(255),
         Tel: Joi.string().min(1).max(10).required(),
         Status: Joi.boolean(),
         Remove: Joi.boolean(),
         Active: Joi.boolean(),
+        Otp: Joi.string().min(1).max(511),
+        OtpExpired: Joi.date(),
     });
 
     // schema options
@@ -179,32 +54,40 @@ const addUserAll: RequestHandler = async (req, res) => {
     try {
         const duplicateUser = await prisma.user.findMany({
             where: {
-                OR: [{ Email: { contains: validatedData.Email } }, { Tel: { contains: validatedData.Tel } }],
+                OR: [
+                    { Email: { contains: validatedData.Email } },
+                    { FirstName: { contains: validatedData.FirstName } },
+                ],
             },
         });
 
         if (duplicateUser && duplicateUser.length > 0) {
             return res.status(422).json({
                 status: 422,
-                message: 'Email or Tel is duplicate in the database.',
+                message: 'Email or FirstName is duplicate in the database.',
                 data: {
                     Email: validatedData.Email,
-                    Tel: validatedData.Tel,
+                    FirstName: validatedData.FirstName,
                 },
             });
         }
 
+        // เข้ารหัสรหัสผ่านก่อนบันทึก
+        const hashedPassword = await bcrypt.hash(validatedData.Password, 10);
+
         const payloadUser = {
             Email: validatedData.Email,
-            Password: validatedData.Password,
+            Password: hashedPassword,
             FirstName: validatedData.FirstName,
             LastName: validatedData.LastName,
-            FullName: validatedData.FullName,
+            FullName: validatedData.FirstName + ' ' + validatedData.LastName,
             Address: validatedData.Address,
             Tel: validatedData.Tel,
             Status: validatedData.Status,
             Remove: validatedData.Remove,
             Active: validatedData.Active,
+            Otp: validatedData.Otp,
+            OtpExpired: new Date(),
         };
 
         const user = await prisma.user.create({
@@ -216,14 +99,14 @@ const addUserAll: RequestHandler = async (req, res) => {
         console.error('Error creating user:', error);
         return res.status(500).json({
             status: 500,
-            message: 'Internal Server Error',
+            message: 'Internal Server Error user',
             data: error,
         });
     }
 };
 
-//!Update User
-const updateUserAll: RequestHandler = async (req, res) => {
+//Update User
+const updateuser: RequestHandler = async (req, res) => {
     const schema = Joi.object({
         UserID: Joi.string().uuid().required(),
     });
@@ -310,7 +193,7 @@ const updateUserAll: RequestHandler = async (req, res) => {
     });
 };
 
-//!Delete User
+//Delete User
 const deleteUserAll: RequestHandler = async (req, res) => {
     const schema = Joi.object({
         UserID: Joi.string().uuid().required(),
@@ -345,14 +228,16 @@ const deleteUserAll: RequestHandler = async (req, res) => {
     });
 };
 
-//!Get User By ID
+//Get UserByID
 const getUserByID: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
+
     try {
-        const { UserIDInput } = req.params;
-        const userByID = await prisma.user.findMany({
+        const { UserID } = req.query;
+
+        const userByID = await prisma.user.findUnique({
             where: {
-                UserID: UserIDInput,
+                UserID: String(UserID),
             },
         });
 
@@ -369,14 +254,14 @@ const getUserByID: RequestHandler = async (req, res) => {
     }
 };
 
-//!search user Email
-const searchUserByEmail: RequestHandler = async (req, res) => {
+//Get Search User by Email
+const SearchUserEmail: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
     try {
-        const { EmailInput } = req.params;
+        const { Email } = req.query;
         const userByEmail = await prisma.user.findMany({
             where: {
-                Email: EmailInput,
+                Email: String(Email),
             },
         });
 
@@ -393,22 +278,23 @@ const searchUserByEmail: RequestHandler = async (req, res) => {
     }
 };
 
-//!search user FullName
-const searchUserByFullname: RequestHandler = async (req, res) => {
+//Get Search User by FullName
+const searchUser: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
     try {
-        const { FullnameInput } = req.params;
-        const userByFullname = await prisma.user.findMany({
+        const { Email, FullName } = req.query;
+
+        const searchUser = await prisma.user.findMany({
             where: {
-                FullName: FullnameInput,
+                OR: [{ Email: String(Email) }, { FullName: String(FullName) }],
             },
         });
 
-        if (!userByFullname) {
-            return res.status(404).json({ error: 'Fullname not found' });
+        if (!searchUser) {
+            return res.status(404).json({ error: 'Email OR FullName not found' });
         }
 
-        return res.json(userByFullname);
+        return res.json(searchUser);
     } catch (error) {
         console.error('Error:', error);
         return res.status(500).json({ error: 'Internal Server Error' });
@@ -417,59 +303,63 @@ const searchUserByFullname: RequestHandler = async (req, res) => {
     }
 };
 
-//!search Email and Fullname
-const searchUserByEF: RequestHandler = async (req, res) => {
+// Amount Most 3 User
+const getAmountmost3user: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
-    try {
-        const { EmailInput } = req.params;
-        const { FullnameInput } = req.params;
-        const userByEF = await prisma.user.findMany({
-            where: {
-                Email: EmailInput,
-                FullName: FullnameInput,
+    const users3 = await prisma.user.findMany({
+        select: {
+            UserID: true,
+            Email: true,
+            Password: true,
+            FirstName: true,
+            LastName: true,
+            FullName: true,
+            Address: true,
+            Tel: true,
+            Status: true,
+            Remove: true,
+            Active: true,
+
+            order: {
+                select: {
+                    orderDetails: {
+                        select: {
+                            Amount: true,
+                            Price: true,
+                        },
+                    },
+                },
             },
-        });
+        },
+    });
 
-        if (!userByEF) {
-            return res.status(404).json({ error: 'Email or Fullname not found' });
-        }
+    const result = users3.map((user) => {
+        const totalAmount = user.order.reduce((sum, order) => {
+            return sum + order.orderDetails.reduce((orderSum, detial) => orderSum + detial.Amount, 0);
+        }, 0);
 
-        return res.json(userByEF);
-    } catch (error) {
-        console.error('Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error' });
-    } finally {
-        await prisma.$disconnect();
-    }
+        return {
+            UserID: user.UserID,
+            Email: user.Email,
+            Password: user.Password,
+            FirstName: user.FirstName,
+            LastName: user.LastName,
+            FullName: user.FullName,
+            Address: user.Address,
+            Tel: user.Tel,
+            Status: user.Status,
+            Remove: user.Remove,
+            Active: user.Active,
+            TotalAmount: totalAmount,
+        };
+    });
+
+    // หาลำดับจากมากไปน้อย
+    const sortedResult = result.sort((min, max) => max.TotalAmount - min.TotalAmount);
+    // หา 3 อันดับแรก
+    const top3Result = sortedResult.slice(0, 3);
+
+    return res.json(top3Result);
 };
 
-const searchUserByEorF: RequestHandler = async (req, res) => {
-    const prisma = new PrismaClient();
-    try {
-        const { EmailInput, FullnameInput } = req.params;
-
-        const userByEF = await prisma.user.findMany({
-            where: {
-                OR: [
-                    { Email: EmailInput },
-                    { FullName: FullnameInput },
-                ],
-            },
-        });
-
-        if (userByEF.length === 0) {
-            return res.status(404).json({ error: 'Email or Fullname not found' });
-        }
-
-        return res.json(userByEF);
-    } catch (error) {
-        console.error('Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error' });
-    } finally {
-        await prisma.$disconnect();
-    }
-};
-
-
-
-export { getUserAll, addUserAll, updateUserAll, deleteUserAll, getUserByID, searchUserByEmail, searchUserByFullname, searchUserByEF, searchUserByEorF };
+export { getuser, adduser, updateuser, deleteUserAll, getUserByID, SearchUserEmail, searchUser, getAmountmost3user };

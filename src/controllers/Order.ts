@@ -50,25 +50,21 @@ const addOrder: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
 
     return await prisma.$transaction(async function (tx) {
-        const duplicateOrder = await tx.order.findMany({
-            where: {
-                OR: [{ OrderID: body.OrderID }, { UserID: body.UserID }],
-            },
-        });
+        // const duplicateOrder = await tx.order.findMany({
+        //     where: {
+        //         OrderID: body.OrderID,
+        //     },
+        // });
 
-        if (duplicateOrder && duplicateOrder.length > 0) {
-            return res.status(422).json({
-                status: 422,
-                message: 'OrderID or UserID is duplicate in database.',
-                data: {
-                    OrderID: body.OrderID,
-                    UserID: body.UserID,
-                },
-            });
-        }
-
-        // Generate salt to hash password
-        // const Salt = await bcrypt.genSalt(10);
+        // if (duplicateOrder && duplicateOrder.length > 0) {
+        //     return res.status(422).json({
+        //         status: 422,
+        //         message: 'OrderID is duplicate in database.',
+        //         data: {
+        //             OrderID: body.OrderID,
+        //         },
+        //     });
+        // }
 
         const payloadUser = {
             UserID: body.UserID,
@@ -173,46 +169,23 @@ const deleteOrder: RequestHandler = async (req, res) => {
     });
 };
 
-//!search Order By Date (dd/mm/yyy) แสดง Product และ เจ้าของ ของ Order นั้นๆ
-const OrderBydate: RequestHandler = async (req, res) => {
+const OrderByID: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
-    try {
-        const { ProductDateOrder } = req.params;
 
-        const DateOrder = await prisma.order.findMany({
+    try {
+        const { OrderID } = req.query;
+
+        const OrderByID = await prisma.order.findUnique({
             where: {
-                CreatedAt: {
-                    gte: new Date(ProductDateOrder),
-                    lt: new Date(new Date(ProductDateOrder).setDate(new Date(ProductDateOrder).getDate() + 1)),
-                },
-            },
-            select: {
-                OrderID: true,
-                DeliveryStatus: true,
-                CreatedAt: true,
-                user: {
-                    select: {
-                        FullName: true,
-                    },
-                },
-                orderDetails: {
-                    select: {
-                        ProductID: true,
-                        product: {
-                            select: {
-                                ProductName: true,
-                            },
-                        },
-                    },
-                },
+                OrderID: String(OrderID),
             },
         });
 
-        if (!DateOrder || DateOrder.length === 0) {
-            return res.status(404).json({ error: 'search Order By Date not found' });
+        if (!OrderByID) {
+            return res.status(404).json({ error: 'OrderID not found' });
         }
 
-        return res.json(DateOrder);
+        return res.json(OrderByID);
     } catch (error) {
         console.error('Error:', error);
         return res.status(500).json({ error: 'Internal Server Error' });
@@ -221,4 +194,48 @@ const OrderBydate: RequestHandler = async (req, res) => {
     }
 };
 
-export { getOrder, addOrder, updateOrder, deleteOrder, OrderBydate };
+//!search Order By Date (dd/mm/yyy) แสดง Product และ เจ้าของ ของ Order นั้นๆ
+const OrderBydate: RequestHandler = async (req, res) => {
+    const prisma = new PrismaClient();
+
+    const ProductDateOrder = req.query;
+
+    const DateOrder = await prisma.order.findMany({
+        where: {
+            CreatedAt: {
+                gte: new Date(String(ProductDateOrder)),
+                lt: new Date(
+                    new Date(String(ProductDateOrder)).setDate(new Date(String(ProductDateOrder)).getDate() + 1),
+                ),
+            },
+        },
+        select: {
+            OrderID: true,
+            DeliveryStatus: true,
+            CreatedAt: true,
+            user: {
+                select: {
+                    FullName: true,
+                },
+            },
+            orderDetails: {
+                select: {
+                    ProductID: true,
+                    product: {
+                        select: {
+                            ProductName: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    if (!DateOrder || DateOrder.length === 0) {
+        return res.status(404).json({ error: 'search Order By Date not found' });
+    }
+
+    return res.json(DateOrder);
+};
+
+export { getOrder, addOrder, updateOrder, deleteOrder, OrderBydate, OrderByID };

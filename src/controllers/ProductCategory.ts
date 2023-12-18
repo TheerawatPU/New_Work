@@ -23,11 +23,9 @@ const getProductCategory: RequestHandler = async (req, res) => {
 //!Create ProductCategory
 const addProductCategory: RequestHandler = async (req, res) => {
     // create schema object
-    const schema =  Joi.object({
-
-        CategoryName:      Joi.string().min(1).max(255).required(),
-        Description:   Joi.string().min(0).max(511),
-
+    const schema = Joi.object({
+        CategoryName: Joi.string().min(1).max(255).required(),
+        Description: Joi.string().min(0).max(511),
     });
 
     // schema options
@@ -54,9 +52,11 @@ const addProductCategory: RequestHandler = async (req, res) => {
     return await prisma.$transaction(async function (tx) {
         const duplicateProductC = await tx.productCategory.findMany({
             where: {
-                OR: [{ CategoryName: { contains: body.CategoryName } },
+                OR: [
+                    { CategoryName: { contains: body.CategoryName } },
                     // { Description: { contains: body.Description } }
-            ]},
+                ],
+            },
         });
 
         if (duplicateProductC && duplicateProductC.length > 0) {
@@ -74,10 +74,8 @@ const addProductCategory: RequestHandler = async (req, res) => {
         // const Salt = await bcrypt.genSalt(10);
 
         const payloadUser = {
-
-            CategoryName:      body.CategoryName,
-            Description:       body.Description,
-
+            CategoryName: body.CategoryName,
+            Description: body.Description,
         };
 
         const productCategory = await tx.productCategory.create({
@@ -116,22 +114,17 @@ const updateProductCategory: RequestHandler = async (req, res) => {
         const payload: any = {};
 
         const checkCategory = await tx.productCategory.findFirst({
-            where:{
-                CategoryID: body.CategoryID
-            }
-        })
-        if(!checkCategory){
+            where: {
+                CategoryID: body.CategoryID,
+            },
+        });
+        if (!checkCategory) {
             return res.status(422).json({ error: 'Category not found' });
         }
 
-        
         if (body.CategoryName) {
             payload['CategoryName'] = body.CategoryName;
         }
-
-        // if (body.Description) {
-        //     payload['Description'] = body.Description;
-        // }
 
         const update = await tx.productCategory.update({
             where: {
@@ -177,6 +170,5 @@ const deleteProductCategory: RequestHandler = async (req, res) => {
         return res.json(deleteProductCategory);
     });
 };
-
 
 export { getProductCategory, addProductCategory, updateProductCategory, deleteProductCategory };

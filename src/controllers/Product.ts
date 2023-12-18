@@ -250,15 +250,15 @@ const ProductJoinCategory: RequestHandler = async (req, res) => {
 };
 
 //!Product Join productCategory And By Id
-const ProductJoinByID: RequestHandler = async (req, res) => {
+const ProductByID: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
     try {
-        const { CategoryIDInput } = req.params;
+        const { ProductByID } = req.query;
         const productsWithCategory = await prisma.product.findMany({
             where: {
                 // ProductID : ProductIDInput,
                 category: {
-                    CategoryID: CategoryIDInput,
+                    CategoryID: String(ProductByID),
                 },
             },
             select: {
@@ -292,13 +292,13 @@ const ProductJoinByID: RequestHandler = async (req, res) => {
 };
 
 //!search product Name
-const searchProductName: RequestHandler = async (req, res) => {
+const SeachByProductName: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
     try {
-        const { ProductName } = req.params;
+        const { ProductName } = req.query;
         const productByproductname = await prisma.product.findMany({
             where: {
-                ProductName: ProductName,
+                ProductName: String(ProductName),
             },
         });
 
@@ -316,7 +316,7 @@ const searchProductName: RequestHandler = async (req, res) => {
 };
 
 //!get ข้อมูล Product Category ว่าแต่ละ Price ของ Category มียอดขายเป็นเจ้านวนกีบาท
-const getSumPriceCategory: RequestHandler = async (req, res) => {
+const getCountProductCategory: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
     try {
         const userCountry = await prisma.product.groupBy({
@@ -344,69 +344,63 @@ const getSumPriceCategory: RequestHandler = async (req, res) => {
 
 //!get ข้อมูล Product Category ว่าในเดือนนั้นๆมียอดขายเป็นจำนวนกี่ชิ้น/กี่บาท รับค่าเป็น month (เลข/ตัวหนังสือก็ได้)
 // ฟังก์ชันเพื่อแปลงชื่อเดือนเป็นตัวเลข
-function getMonthNumber(monthName: string): number | null {
-    const months: { [key: string]: number } = {
-        january: 1,
-        february: 2,
-        march: 3,
-        april: 4,
-        may: 5,
-        june: 6,
-        july: 7,
-        august: 8,
-        september: 9,
-        october: 10,
-        november: 11,
-        december: 12,
-    };
 
-    const normalizedMonth = monthName.toLowerCase();
-    return months[normalizedMonth] || null;
-}
+const monthNameToNumber: { [key: string]: number } = {
+    january: 1,
+    february: 2,
+    march: 3,
+    april: 4,
+    may: 5,
+    june: 6,
+    july: 7,
+    august: 8,
+    september: 9,
+    october: 10,
+    november: 11,
+    december: 12,
+};
 
-const getSumPriceMonth: RequestHandler = async (req, res) => {
+const getProductDate: RequestHandler = async (req, res) => {
     const prisma = new PrismaClient();
 
-    const { Month } = req.params;
-    try {
-        // ตรวจสอบว่า Month เป็นเลข 1-12 หรือไม่
-        const isNumericMonth = /^[1-9]|1[0-2]$/.test(Month);
+    // ดึงข้อมูลเดือนจาก query
+    let { month } = req.query;
 
-        // ถ้า Month เป็นเลข 1-12 ให้ใช้เลขนั้นเป็นตัวเลขเดือน
-        const monthNumber = isNumericMonth ? parseInt(Month, 10) : getMonthNumber(Month);
-
-        // แปลงค่า Month เป็นช่วงวันที่ครอบคลุมเดือนนั้น
-        const startDate = dayjs(`${new Date().getFullYear()}-${monthNumber}`).startOf('month').toDate();
-        const endDate = dayjs(`${new Date().getFullYear()}-${monthNumber}`).endOf('month').toDate();
-
-        // คำสั่ง Prisma ในการหายอดรวมราคาของสินค้าตาม Category ในช่วงเวลานั้น
-        const CategorySum = await prisma.product.groupBy({
-            where: {
-                CreatedAt: {
-                    gte: startDate,
-                    lt: endDate,
-                },
-            },
-            by: ['CateGoryID', 'CreatedAt'],
-            _sum: {
-                Price: true,
-            },
-            _count: {
-                ProductID: true,
-            },
-        });
-
-        if (!CategorySum.length) {
-            return res.status(404).json({ error: 'CategorySum not found' });
-        }
-
-        return res.json(CategorySum);
-    } catch (error) {
-        console.error('Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error' });
-    } finally {
-        await prisma.$disconnect();
+    // ตรวจสอบว่า month เป็นตัวเลขหรือชื่อเดือน
+    let parsedMonth: number;
+    if (!isNaN(parseInt(String(month), 10))) {
+        parsedMonth = parseInt(String(month), 10);
+    } else {
+        const monthName = String(month).toLowerCase();
+        parsedMonth = monthNameToNumber[monthName];
     }
+
+    // ตรวจสอบว่า parsedMonth เป็นตัวเลขระหว่าง 1-12
+    if (isNaN(parsedMonth) || parsedMonth < 1 || parsedMonth > 12) {
+        return res.status(400).json({ error: 'Please provide a valid month name or number between 1 and 12.' });
+    }
+
+    // ใช้ปีปัจจบัน
+    const year = new Date().getFullYear();
+
+    // กำหนดวันเริ่มต้นและสิ้นสุดของเดือน
+    const startDate = dayjs(`${year}-${parsedMonth}`).startOf('month').toDate();
+    const endDate = dayjs(`${year}-${parsedMonth}`).endOf('month').toDate();
+
+    const totalPrice = await prisma.product.aggregate({
+        _sum: {
+            Price: true,
+            Stock: true,
+        },
+        _count: {
+            ProductID: true,
+        },
+        where: {
+            AND: [{ CreatedAt: { gte: startDate } }, { CreatedAt: { lte: endDate } }],
+        },
+    });
+
+    return res.json(totalPrice);
 };
 
 export {
@@ -415,8 +409,8 @@ export {
     updateProduct,
     deleteProduct,
     ProductJoinCategory,
-    ProductJoinByID,
-    searchProductName,
-    getSumPriceCategory,
-    getSumPriceMonth,
+    ProductByID,
+    SeachByProductName,
+    getCountProductCategory,
+    getProductDate,
 };
